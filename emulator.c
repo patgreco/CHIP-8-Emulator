@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <SDL2/SDL.h>
 #include "emulator.h"
 
-void initialize()
-{
-    pc = START_ADDRESS;
-    I = 0x0;
-}
+int draw_flag = 0;
+int running = 1;
 
 int load_rom(const char *filename)
 {
@@ -56,6 +54,185 @@ int load_rom(const char *filename)
     return 0;
 }
 
+void initialize(SDL_Renderer *renderer)
+{
+    pc = START_ADDRESS;
+    I = 0x0000;
+    memset(stack, 0, sizeof(stack));
+    memset(V, 0, sizeof(V));
+    memset(keypad, 0, sizeof(keypad));
+    sp = 0;
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+}
+
+void handle_input(SDL_Event *e, uint8_t *keypad)
+{
+    while (SDL_PollEvent(e))
+    {
+        if (e->type == SDL_QUIT)
+            running = 0;
+
+        else if (e->type == SDL_KEYDOWN || e->type == SDL_KEYUP)
+        {
+            int key = map_sdl_key_to_chip8(e->key.keysym.sym);
+            if (key != -1)
+            {
+                keypad[key] = (e->type == SDL_KEYDOWN) ? 1 : 0;
+            }
+        }
+    }
+}
+
+void emulate_cycle()
+{
+    uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
+    pc += 2;
+
+    switch (opcode & 0xF000)
+    {
+    case 0x0000:
+        switch (opcode & 0x0FFF)
+        {
+        case 0x00E0:
+            // Clear screen
+            memset(video, 0, sizeof(video));
+            draw_flag = 1;
+            break;
+        case 0x00EE:
+            // Return from subroutine
+            sp--;
+            pc = stack[sp];
+            draw_flag = 0;
+            break;
+        default:
+            // SYS addr (usually ignored), deal with it later
+            // printf("Warning: Ignored opcode 0x%04X (0NNN call)\n", opcode);
+            break;
+        }
+        break;
+    case 0x1000:
+        // Jump
+        pc = opcode & 0x0FFF;
+        draw_flag = 0;
+        break;
+    case 0x2000:
+        // Call subroutine
+        stack[sp] = pc;
+        sp++;
+        pc = opcode & 0x0FFF;
+        draw_flag = 0;
+        break;
+    case 0x3000:
+        // Skip conditionally
+        uint8_t value = opcode & 0x00FF;
+        if (value == V[opcode & 0x0F00])
+        {
+            pc += 2;
+        }
+        draw_flag = 0;
+        break;
+    case 0x4000:
+        // Skip conditionally
+        uint8_t value = opcode & 0x00FF;
+        if (value != V[opcode & 0x0F00])
+        {
+            pc += 2;
+        }
+        draw_flag = 0;
+        break;
+    case 0x5000:
+        // Skip conditionally
+        if ((opcode & 0x000F) == 0x0000)
+        {
+            if (V[opcode & 0x00F0] == V[opcode & 0x0F00])
+            {
+                pc += 2;
+            }
+            draw_flag = 0;
+        }
+        else
+        {
+            // Invalid opcode, deal with it later
+        }
+        break;
+    case 0x9000:
+        // Skip conditionally
+        if ((opcode & 0x000F) == 0x0000)
+        {
+            if (V[opcode & 0x00F0] != V[opcode & 0x0F00])
+            {
+                pc += 2;
+            }
+            draw_flag = 0;
+        }
+        else
+        {
+            // Invalid opcode, deal with it later
+        }
+        break;
+    case 0x6000:
+        // Set
+        V[opcode & 0x0F00] = opcode & 0x00FF;
+        break;
+    case 0x7000:
+        // Add
+        V[opcode & 0x0F00] += opcode & 0x00FF;
+        break;
+    case 0x8000:
+        // Logical and arithmetic instructions
+        break;
+    case 0xA000:
+        // Set index
+        I = opcode & 0x0FFF;
+        break;
+    case 0xB000:
+        // Jump with offset
+        break;
+    case 0xC000:
+        // Random
+        break;
+    case 0xD000:
+        // Display
+
+        break;
+    case 0xE000:
+        // Skip if key
+        break;
+    case 0xF000:
+        break;
+    default:
+        // default code block
+    }
+}
+
+void render(SDL_Renderer *renderer, uint8_t *video)
+{
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
+    SDL_RenderClear(renderer);
+
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // White pixels
+
+    for (int y = 0; y < 32; ++y)
+    {
+        for (int x = 0; x < 64; ++x)
+        {
+            if (video[y * 64 + x])
+            {
+                SDL_Rect pixel = {
+                    x * WINDOW_SCALE,
+                    y * WINDOW_SCALE,
+                    WINDOW_SCALE,
+                    WINDOW_SCALE};
+                SDL_RenderFillRect(renderer, &pixel);
+            }
+        }
+    }
+
+    SDL_RenderPresent(renderer);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -64,21 +241,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    initialize();
-
     if (load_rom(argv[1]) != 0)
     {
         return 1;
     }
 
     // Now memory[0x200] contains the first byte of the CHIP-8 program
-
-    // Next: implement fetch-decode-execute loop...
-    // uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
-    // Decode: Use bit masking to figure out which instruction it is.
-    // Execute: Call the corresponding function or logic.
-
-    return 0;
 
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -87,39 +255,23 @@ int main(int argc, char *argv[])
                                           WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
-    int running = 1;
     SDL_Event event;
+
+    initialize(renderer);
 
     while (running)
     {
-        uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
-        pc += 2;
+        handle_input(&event, &keypad);
 
-        switch (opcode & 0xF000)
+        emulate_cycle();
+
+        if (draw_flag)
         {
-        case 0x0000:
-            switch (opcode & 0x00FF)
-            {
-            case 0x00E0:
-                // Clear screen
-                break;
-            case 0x00EE:
-                // Return from subroutine
-                break;
-            default:
-                // SYS addr (usually ignored)
-                break;
-            }
-            break;
-        case 0x1000:
-            // code block
-            break;
-        default:
-            // default code block
+            render(renderer, &video);
+            draw_flag = 0;
         }
 
-        while (SDL_PollEvent(&event))
+        /*while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
                 running = 0;
@@ -127,7 +279,8 @@ int main(int argc, char *argv[])
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        SDL_RenderPresent(renderer);
+        SDL_RenderPresent(renderer);*/
+
         SDL_Delay(16); // ~60fps
     }
 
