@@ -82,7 +82,10 @@ int main(int argc, char *argv[])
 
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_Window *window = SDL_CreateWindow("SDL Demo", 100, 100, 640, 480, SDL_WINDOW_SHOWN);
+    SDL_Window *window = SDL_CreateWindow("CHIP-8 Emulator",
+                                          SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                                          WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     int running = 1;
@@ -90,6 +93,32 @@ int main(int argc, char *argv[])
 
     while (running)
     {
+        uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
+        pc += 2;
+
+        switch (opcode & 0xF000)
+        {
+        case 0x0000:
+            switch (opcode & 0x00FF)
+            {
+            case 0x00E0:
+                // Clear screen
+                break;
+            case 0x00EE:
+                // Return from subroutine
+                break;
+            default:
+                // SYS addr (usually ignored)
+                break;
+            }
+            break;
+        case 0x1000:
+            // code block
+            break;
+        default:
+            // default code block
+        }
+
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)

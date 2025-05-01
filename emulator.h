@@ -1,17 +1,25 @@
+#include <stdint.h>
+
 #define MEMORY_SIZE 4096
 #define START_ADDRESS 0x200
 
+#define WINDOW_SCALE 10
+#define WINDOW_WIDTH (64 * WINDOW_SCALE)
+#define WINDOW_HEIGHT (32 * WINDOW_SCALE)
+
 // Should represent RAM
-unsigned char memory[MEMORY_SIZE];
+uint8_t memory[MEMORY_SIZE];
 
 // Should represent the general purpose registers
-unsigned char V[16];
+uint8_t V[16];
 
 // Should represent the I register
-unsigned short I;
+uint16_t I;
 
 // Should represent the program counter
-unsigned short pc;
+uint16_t pc;
 
 // Should represent the stack
-unsigned short stack[16];
+uint16_t stack[16];
+
+uint8_t video[64 * 32];
