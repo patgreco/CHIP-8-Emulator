@@ -7,6 +7,7 @@
 
 int draw_flag = 0;
 int running = 1;
+int CONFIGURED = 0;
 
 int load_rom(const char *filename)
 {
@@ -67,7 +68,7 @@ void initialize(SDL_Renderer *renderer)
     SDL_RenderPresent(renderer);
 }
 
-void handle_input(SDL_Event *e, uint8_t *keypad)
+/*void handle_input(SDL_Event *e, uint8_t *keypad)
 {
     while (SDL_PollEvent(e))
     {
@@ -83,12 +84,16 @@ void handle_input(SDL_Event *e, uint8_t *keypad)
             }
         }
     }
-}
+}*/
 
 void emulate_cycle()
 {
     uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
     pc += 2;
+
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+    uint8_t value = opcode & 0x00FF;
 
     switch (opcode & 0xF000)
     {
@@ -126,8 +131,7 @@ void emulate_cycle()
         break;
     case 0x3000:
         // Skip conditionally
-        uint8_t value = opcode & 0x00FF;
-        if (value == V[opcode & 0x0F00])
+        if (value == V[x])
         {
             pc += 2;
         }
@@ -135,8 +139,7 @@ void emulate_cycle()
         break;
     case 0x4000:
         // Skip conditionally
-        uint8_t value = opcode & 0x00FF;
-        if (value != V[opcode & 0x0F00])
+        if (value != V[x])
         {
             pc += 2;
         }
@@ -146,7 +149,7 @@ void emulate_cycle()
         // Skip conditionally
         if ((opcode & 0x000F) == 0x0000)
         {
-            if (V[opcode & 0x00F0] == V[opcode & 0x0F00])
+            if (V[x] == V[y])
             {
                 pc += 2;
             }
@@ -161,7 +164,7 @@ void emulate_cycle()
         // Skip conditionally
         if ((opcode & 0x000F) == 0x0000)
         {
-            if (V[opcode & 0x00F0] != V[opcode & 0x0F00])
+            if (V[x] != V[y])
             {
                 pc += 2;
             }
@@ -174,14 +177,86 @@ void emulate_cycle()
         break;
     case 0x6000:
         // Set
-        V[opcode & 0x0F00] = opcode & 0x00FF;
+        V[x] = opcode & 0x00FF;
         break;
     case 0x7000:
         // Add
-        V[opcode & 0x0F00] += opcode & 0x00FF;
+        V[x] += opcode & 0x00FF;
         break;
     case 0x8000:
         // Logical and arithmetic instructions
+        switch (opcode & 0x000F)
+        {
+        case 0x0000:
+            // Set
+            V[x] = V[y];
+            break;
+        case 0x0001:
+            // Binary OR
+            V[x] = V[x] | V[y];
+            break;
+        case 0x0002:
+            // Binary AND
+            V[x] = V[x] & V[y];
+            break;
+        case 0x0003:
+            // Binary XOR
+            V[x] = V[x] ^ V[y];
+            break;
+        case 0x0004:
+            // Add
+            if (V[x] + V[y] > 255)
+                V[0xF] = 1;
+            else
+                V[0xF] = 0;
+
+            V[x] = V[x] + V[y];
+            break;
+        }
+        break;
+    case 0x0005:
+        // Subtract
+        if (V[x] >= V[y])
+            V[0xF] = 1;
+        else
+            V[0xF] = 0;
+
+        V[x] = V[x] - V[y];
+        break;
+    case 0x0007:
+        // Subtract
+        if (V[y] >= V[x])
+            V[0xF] = 1;
+        else
+            V[0xF] = 0;
+
+        V[x] = V[y] - V[x];
+        break;
+    case 0x0006:
+        // Shift
+        if (CONFIGURED)
+        {
+            V[x] = V[y];
+        }
+        if ((V[x] & 0x01) == 0x01)
+            V[0xF] = 1;
+        else
+            V[0xF] = 0;
+
+        V[x] = V[x] >> 1;
+        break;
+    case 0x000E:
+        // Shift
+        if (CONFIGURED)
+        {
+            V[x] = V[y];
+        }
+        if ((V[x] & 0x80) == 0x80)
+            V[0xF] = 1;
+        else
+            V[0xF] = 0;
+
+        V[x] = V[x] << 1;
         break;
     case 0xA000:
         // Set index
@@ -203,6 +278,7 @@ void emulate_cycle()
     case 0xF000:
         break;
     default:
+        printf("Not done here yet\n");
         // default code block
     }
 }
@@ -235,16 +311,31 @@ void render(SDL_Renderer *renderer, uint8_t *video)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
     {
-        fprintf(stderr, "Usage: %s romfile\n", argv[0]);
+        fprintf(stderr, "Usage: %s romfile [FLAG]\nwhere FLAG is \"set\"\n", argv[0]);
         return 1;
+    }
+
+    if (argc == 3)
+    {
+        if (strcmp(argv[2], "set") == 0)
+        {
+            CONFIGURED = 1;
+        }
+        else
+        {
+            fprintf(stderr, "Usage: %s romfile [FLAG]\nwhere FLAG is \"set\"\n", argv[0]);
+            return 1;
+        }
     }
 
     if (load_rom(argv[1]) != 0)
     {
         return 1;
     }
+
+    return 0; // Here for now to test the loading part
 
     // Now memory[0x200] contains the first byte of the CHIP-8 program
 
@@ -261,13 +352,13 @@ int main(int argc, char *argv[])
 
     while (running)
     {
-        handle_input(&event, &keypad);
+        // handle_input(&event, &keypad);
 
         emulate_cycle();
 
         if (draw_flag)
         {
-            render(renderer, &video);
+            render(renderer, video);
             draw_flag = 0;
         }
 
