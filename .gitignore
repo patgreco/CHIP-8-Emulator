@@ -1,4 +1,3 @@
-test.ch8
 *.dSYM/
-FDE.*
+.DS_Store
 emulator

@@ -63,6 +63,120 @@ void initialize(SDL_Renderer *renderer)
     memset(V, 0, sizeof(V));
     memset(keypad, 0, sizeof(keypad));
     sp = 0;
+
+    // Set fonts
+    // 0
+    memory[0x050] = 0xF0;
+    memory[0x051] = 0x90;
+    memory[0x052] = 0x90;
+    memory[0x053] = 0x90;
+    memory[0x054] = 0xF0;
+
+    // 1
+    memory[0x055] = 0x20;
+    memory[0x056] = 0x60;
+    memory[0x057] = 0x20;
+    memory[0x058] = 0x20;
+    memory[0x059] = 0x70;
+
+    // 2
+    memory[0x05A] = 0xF0;
+    memory[0x05B] = 0x10;
+    memory[0x05C] = 0xF0;
+    memory[0x05D] = 0x80;
+    memory[0x05E] = 0xF0;
+
+    // 3
+    memory[0x05F] = 0xF0;
+    memory[0x060] = 0x10;
+    memory[0x061] = 0xF0;
+    memory[0x062] = 0x10;
+    memory[0x063] = 0xF0;
+
+    // 4
+    memory[0x064] = 0x90;
+    memory[0x065] = 0x90;
+    memory[0x066] = 0xF0;
+    memory[0x067] = 0x10;
+    memory[0x068] = 0x10;
+
+    // 5
+    memory[0x069] = 0xF0;
+    memory[0x06A] = 0x80;
+    memory[0x06B] = 0xF0;
+    memory[0x06C] = 0x10;
+    memory[0x06D] = 0xF0;
+
+    // 6
+    memory[0x06E] = 0xF0;
+    memory[0x06F] = 0x80;
+    memory[0x070] = 0xF0;
+    memory[0x071] = 0x90;
+    memory[0x072] = 0xF0;
+
+    // 7
+    memory[0x073] = 0xF0;
+    memory[0x074] = 0x10;
+    memory[0x075] = 0x20;
+    memory[0x076] = 0x40;
+    memory[0x077] = 0x40;
+
+    // 8
+    memory[0x078] = 0xF0;
+    memory[0x079] = 0x90;
+    memory[0x07A] = 0xF0;
+    memory[0x07B] = 0x90;
+    memory[0x07C] = 0xF0;
+
+    // 9
+    memory[0x07D] = 0xF0;
+    memory[0x07E] = 0x90;
+    memory[0x07F] = 0xF0;
+    memory[0x080] = 0x10;
+    memory[0x081] = 0xF0;
+
+    // A
+    memory[0x082] = 0xF0;
+    memory[0x083] = 0x90;
+    memory[0x084] = 0xF0;
+    memory[0x085] = 0x90;
+    memory[0x086] = 0x90;
+
+    // B
+    memory[0x087] = 0xE0;
+    memory[0x088] = 0x90;
+    memory[0x089] = 0xE0;
+    memory[0x08A] = 0x90;
+    memory[0x08B] = 0xE0;
+
+    // C
+    memory[0x08C] = 0xF0;
+    memory[0x08D] = 0x80;
+    memory[0x08E] = 0x80;
+    memory[0x08F] = 0x80;
+    memory[0x090] = 0xF0;
+
+    // D
+    memory[0x091] = 0xE0;
+    memory[0x092] = 0x90;
+    memory[0x093] = 0x90;
+    memory[0x094] = 0x90;
+    memory[0x095] = 0xE0;
+
+    // E
+    memory[0x096] = 0xF0;
+    memory[0x097] = 0x80;
+    memory[0x098] = 0xF0;
+    memory[0x099] = 0x80;
+    memory[0x09A] = 0xF0;
+
+    // F
+    memory[0x09B] = 0xF0;
+    memory[0x09C] = 0x80;
+    memory[0x09D] = 0xF0;
+    memory[0x09E] = 0x80;
+    memory[0x09F] = 0x80;
+
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
@@ -178,10 +292,12 @@ void emulate_cycle()
     case 0x6000:
         // Set
         V[x] = opcode & 0x00FF;
+        draw_flag = 0;
         break;
     case 0x7000:
         // Add
         V[x] += opcode & 0x00FF;
+        draw_flag = 0;
         break;
     case 0x8000:
         // Logical and arithmetic instructions
@@ -190,18 +306,22 @@ void emulate_cycle()
         case 0x0000:
             // Set
             V[x] = V[y];
+            draw_flag = 0;
             break;
         case 0x0001:
             // Binary OR
             V[x] = V[x] | V[y];
+            draw_flag = 0;
             break;
         case 0x0002:
             // Binary AND
             V[x] = V[x] & V[y];
+            draw_flag = 0;
             break;
         case 0x0003:
             // Binary XOR
             V[x] = V[x] ^ V[y];
+            draw_flag = 0;
             break;
         case 0x0004:
             // Add
@@ -211,6 +331,7 @@ void emulate_cycle()
                 V[0xF] = 0;
 
             V[x] = V[x] + V[y];
+            draw_flag = 0;
             break;
         }
         break;
@@ -222,6 +343,7 @@ void emulate_cycle()
             V[0xF] = 0;
 
         V[x] = V[x] - V[y];
+        draw_flag = 0;
         break;
     case 0x0007:
         // Subtract
@@ -231,6 +353,7 @@ void emulate_cycle()
             V[0xF] = 0;
 
         V[x] = V[y] - V[x];
+        draw_flag = 0;
         break;
     case 0x0006:
         // Shift
@@ -244,6 +367,7 @@ void emulate_cycle()
             V[0xF] = 0;
 
         V[x] = V[x] >> 1;
+        draw_flag = 0;
         break;
     case 0x000E:
         // Shift
@@ -257,10 +381,12 @@ void emulate_cycle()
             V[0xF] = 0;
 
         V[x] = V[x] << 1;
+        draw_flag = 0;
         break;
     case 0xA000:
         // Set index
         I = opcode & 0x0FFF;
+        draw_flag = 0;
         break;
     case 0xB000:
         // Jump with offset
@@ -270,8 +396,45 @@ void emulate_cycle()
         break;
     case 0xD000:
         // Display
+        {
+            uint8_t xCoord = V[x] % 64;
+            uint8_t yCoord = V[y] % 32;
+            V[0xF] = 0;
+            int N = opcode & 0x000F;
+            for (int i = 0; i < N; i++)
+            {
+                u_int8_t NthByte = memory[I + i];
+                uint8_t pixelY = (yCoord + i) % 32;
+                for (int j = 0; j < 8; j++)
+                {
+                    uint8_t pixelX = (xCoord + j) % 64;
+                    uint8_t bit = (NthByte >> (7 - j)) & 1;
+                    uint32_t index = pixelY * 64 + pixelX;
 
-        break;
+                    if (bit && video[index])
+                    {
+                        video[index] = 0;
+                        V[0xF] = 1;
+                    }
+                    else if (bit && video[index] == 0)
+                    {
+                        video[index] = 1;
+                    }
+                    if (pixelX == 63)
+                    {
+                        // Reached edge of screen
+                        break;
+                    }
+                }
+                if (pixelY == 31)
+                {
+                    // Reached edge of screen
+                    break;
+                }
+            }
+            draw_flag = 1;
+            break;
+        }
     case 0xE000:
         // Skip if key
         break;
@@ -279,6 +442,7 @@ void emulate_cycle()
         break;
     default:
         printf("Not done here yet\n");
+        break;
         // default code block
     }
 }
@@ -335,25 +499,51 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    return 0; // Here for now to test the loading part
-
     // Now memory[0x200] contains the first byte of the CHIP-8 program
 
-    SDL_Init(SDL_INIT_VIDEO);
+    // Initialize SDL
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    {
+        fprintf(stderr, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        return 1;
+    }
 
     SDL_Window *window = SDL_CreateWindow("CHIP-8 Emulator",
                                           SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 
+    if (window == NULL)
+    {
+        fprintf(stderr, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    if (renderer == NULL)
+    {
+        fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
     SDL_Event event;
 
     initialize(renderer);
 
     while (running)
     {
-        // handle_input(&event, &keypad);
+        while (SDL_PollEvent(&event) != 0)
+        {
+            if (event.type == SDL_QUIT)
+            {
+                running = 0; // Close the window when the user clicks the close button
+            }
+        }
 
+        // handle_input(&event, &keypad);
         emulate_cycle();
 
         if (draw_flag)
@@ -361,16 +551,6 @@ int main(int argc, char *argv[])
             render(renderer, video);
             draw_flag = 0;
         }
-
-        /*while (SDL_PollEvent(&event))
-        {
-            if (event.type == SDL_QUIT)
-                running = 0;
-        }
-
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-        SDL_RenderPresent(renderer);*/
 
         SDL_Delay(16); // ~60fps
     }
