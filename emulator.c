@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <SDL2/SDL.h>
+#include <time.h>
 #include "emulator.h"
 
 int draw_flag = 0;
@@ -63,6 +64,8 @@ void initialize(SDL_Renderer *renderer)
     memset(V, 0, sizeof(V));
     memset(keypad, 0, sizeof(keypad));
     sp = 0;
+    delay_timer = 0;
+    sound_timer = 0;
 
     // Set fonts
     // 0
@@ -180,9 +183,57 @@ void initialize(SDL_Renderer *renderer)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
+
+    // Initialize the random seed for the CXNN instruction
+    srand(time(NULL));
 }
 
-/*void handle_input(SDL_Event *e, uint8_t *keypad)
+int map_sdl_key_to_chip8(SDL_Keycode key)
+{
+    switch (key)
+    {
+    case SDLK_1:
+        return 0x1;
+    case SDLK_2:
+        return 0x2;
+    case SDLK_3:
+        return 0x3;
+    case SDLK_4:
+        return 0xC;
+
+    case SDLK_q:
+        return 0x4;
+    case SDLK_w:
+        return 0x5;
+    case SDLK_e:
+        return 0x6;
+    case SDLK_r:
+        return 0xD;
+
+    case SDLK_a:
+        return 0x7;
+    case SDLK_s:
+        return 0x8;
+    case SDLK_d:
+        return 0x9;
+    case SDLK_f:
+        return 0xE;
+
+    case SDLK_z:
+        return 0xA;
+    case SDLK_x:
+        return 0x0;
+    case SDLK_c:
+        return 0xB;
+    case SDLK_v:
+        return 0xF;
+
+    default:
+        return -1; // Not a CHIP-8 key
+    }
+}
+
+void handle_input(SDL_Event *e, uint8_t *keypad)
 {
     while (SDL_PollEvent(e))
     {
@@ -198,7 +249,7 @@ void initialize(SDL_Renderer *renderer)
             }
         }
     }
-}*/
+}
 
 void emulate_cycle()
 {
@@ -208,6 +259,7 @@ void emulate_cycle()
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
     uint8_t value = opcode & 0x00FF;
+    uint8_t key = V[x];
 
     switch (opcode & 0xF000)
     {
@@ -390,9 +442,11 @@ void emulate_cycle()
         break;
     case 0xB000:
         // Jump with offset
+        pc = (opcode & 0x0FFF) + V[0];
         break;
     case 0xC000:
         // Random
+        V[x] = (rand() % 256) & (opcode & 0x00FF);
         break;
     case 0xD000:
         // Display
@@ -437,8 +491,44 @@ void emulate_cycle()
         }
     case 0xE000:
         // Skip if key
+        if ((opcode & 0x00FF) == 0x009E)
+        {
+            if (keypad[key])
+            {
+                pc += 2;
+            }
+        }
+        else if ((opcode & 0x00FF) == 0x00A1)
+        {
+            if (!keypad[key])
+            {
+                pc += 2;
+            }
+        }
+        else
+        {
+            // Invalid opcode, deal with it later
+        }
         break;
     case 0xF000:
+        switch (opcode & 0x00FF)
+        {
+        case 0x0007:
+            // Delay timer
+            V[x] = delay_timer;
+            break;
+        case 0x0015:
+            // Delay timer
+            delay_timer = V[x];
+            break;
+        case 0x0018:
+            // Sound timer
+            sound_timer = V[x];
+            break;
+        default:
+            // Invalid opcode, deal with it later
+            break;
+        }
         break;
     default:
         printf("Not done here yet\n");
@@ -533,17 +623,12 @@ int main(int argc, char *argv[])
 
     initialize(renderer);
 
+    uint32_t last_timer_tick = 0;
+
     while (running)
     {
-        while (SDL_PollEvent(&event) != 0)
-        {
-            if (event.type == SDL_QUIT)
-            {
-                running = 0; // Close the window when the user clicks the close button
-            }
-        }
+        handle_input(&event, keypad);
 
-        // handle_input(&event, &keypad);
         emulate_cycle();
 
         if (draw_flag)
@@ -552,7 +637,24 @@ int main(int argc, char *argv[])
             draw_flag = 0;
         }
 
-        SDL_Delay(16); // ~60fps
+        // Decrement timers at 60Hz
+        uint32_t now = SDL_GetTicks();          // Milliseconds since SDL init
+        if (now - last_timer_tick >= 1000 / 60) // 16.67 ms
+        {
+            if (delay_timer > 0)
+                delay_timer--;
+
+            if (sound_timer > 0)
+            {
+                sound_timer--;
+                // printf("BEEP!\n");
+                // Can play a beep while sound_timer > 0
+            }
+
+            last_timer_tick = now;
+        }
+
+        SDL_Delay(1); // ~60fps
     }
 
     SDL_DestroyRenderer(renderer);

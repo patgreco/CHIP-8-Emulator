@@ -28,5 +28,9 @@ uint8_t sp;
 // Represents the CHIP-8 display (64 * 32 pixels)
 uint8_t video[64 * 32];
 
+uint8_t delay_timer;
+
+uint8_t sound_timer;
+
 // Represents the CHIP-8 keypad
 uint8_t keypad[16]; // 1 = pressed, 0 = not pressed
