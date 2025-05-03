@@ -525,6 +525,60 @@ void emulate_cycle()
             // Sound timer
             sound_timer = V[x];
             break;
+        case 0x001E:
+            // Add to index
+            {
+                uint16_t result = I + V[x];
+                V[0xF] = (result > 0xFFF) ? 1 : 0;
+                I = result;
+            }
+            break;
+        case 0x000A:
+            // Get key
+            {
+                int buttonPressed = -1;
+                for (int i = 0; i < 16; i++)
+                {
+                    if (keypad[i])
+                    {
+                        buttonPressed = i;
+                        break;
+                    }
+                }
+                if (buttonPressed == -1)
+                {
+                    pc = pc - 2;
+                }
+                else
+                {
+                    V[x] = buttonPressed;
+                }
+            }
+            break;
+        case 0x0029:
+            // Font character
+            I = 0x050 + (V[x] * 5);
+            break;
+        case 0x0033:
+            // BCD conversion
+            memory[I] = V[x] / 100;           // Hundreds
+            memory[I + 1] = (V[x] / 10) % 10; // Tens
+            memory[I + 2] = V[x] % 10;        // Ones
+            break;
+        case 0x0055:
+            // Store memory
+            for (int i = 0; i <= x; i++)
+            {
+                memory[I + i] = V[i];
+            }
+            break;
+        case 0x0065:
+            // Load memory
+            for (int i = 0; i <= x; i++)
+            {
+                V[i] = memory[I + i];
+            }
+            break;
         default:
             // Invalid opcode, deal with it later
             break;
